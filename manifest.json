@@ -1,0 +1,35 @@
+{
+    "name": "Canvas Extensions",
+    "description": "Adds teacher tools to Canvas",
+    "version": "0.1",
+    "manifest_version": 3,
+    "permissions": [
+        "storage"
+    ],
+    "action": {
+        "default_popup": "html/settings.html",
+        "default_icon": "img/logo-64.png"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://*.instructure.com/courses/*/gradebook"
+            ],
+            "js": [
+                "js/gradebook.js"
+            ]
+        },
+        {
+            "matches": [
+                "https://*.instructure.com/courses/*/quizzes/*/edit"
+            ],
+            "js": [
+                "js/quizClassic.js",
+                "js/jszip.min.js"
+            ],
+            "css": [
+                "css/quizClassic.css"
+            ]
+        }
+    ]
+}

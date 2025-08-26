@@ -1,0 +1,24 @@
+div#csr-import {
+    border: 1px solid silver;
+    border-radius: 8px;
+    max-width: 600px;
+    margin: 10px auto;
+    padding: 10px;
+}
+
+.csr-hidden {
+    display: none;
+}
+
+.csr-buttons {
+    display: flex;
+    width: 100%;
+    margin-top: 10px;
+    gap: 10px;
+    justify-content: space-between;
+}
+
+.csr-buttons > div {
+    white-space: nowrap;
+    flex-grow: 1;
+}
