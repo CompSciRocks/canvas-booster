@@ -15,22 +15,35 @@ const csrClassQuiz = {
             Select the QTI zip file to upload and import into this quiz. If the zip has groups of questions they'll be imported as new groups. If you'd rather import into an existing group use the icon in the right toolbar for that group.
             </p>
             <p>
-            This does not currently support images. Uploading will trigger this quiz to save and page reload.
+            This does not currently support images, and only supports multiple choice questions. 
             </p>
         </div>
 
-        <div style="margin-top: 20px; margin-bottom: 20px;">
-            <label for="csr-qti-file" class="control-label">QTI Zip File</label>
-            <input type="file" id="csr-qti-file" name="csr-qti-file" accept=".zip">
+        <div style="margin-top: 20px; margin-bottom: 20px;" class="csr-form-grid">
+            <div>    
+                QTI Zip File
+            </div>
+            <div>
+                <input type="file" id="csr-qti-file" name="csr-qti-file" accept=".zip">
+            </div>
+
+            <div>
+                Group
+            </div>
+            <div>
+                <select id="csr-question-group" name="csr-question-group"></select>
+            </div>
+
         </div>
 
         <div class="csr-buttons">
             <div>
                 <div style="width:100%;flex-grow: 1;">
-                    <progress id="csr-upload-progress" value="37" max="100" style="width:90%;margin: 0 auto;"></progress>
+                    <progress id="csr-upload-progress" value="37" max="100" style="width:90%;margin: 0 auto;" class="csr-hidden"></progress>
+                    <span id="csr-upload-message" style="width:90%;margin: 0 auto;display:block;text-align:left;" class="csr-hidden"></span>
                 </div>
             </div>
-            <div style="flex-grow: 0;">
+            <div style="flex-grow: 0;" class="csr-nowrap">
                 <a class="btn" id="csr-upload-cancel" style="margin-right:16px;">Cancel</a>
                 <a class="btn btn-primary" id="csr-upload-qti">Upload</a>
             </div>  
@@ -58,6 +71,35 @@ const csrClassQuiz = {
                 e.preventDefault();
                 let elDialog = document.getElementById('csr-import');
                 elDialog.classList.toggle('csr-hidden');
+
+                // If visible
+                if (!elDialog.classList.contains('csr-hidden')) {
+                    let elSelect = document.getElementById('csr-question-group');
+                    let groups = csrClassQuiz.getGroups();
+
+                    // Append groups to the #csr-question-group select
+                    elSelect.innerHTML = '<option value="">No Group</option>';
+                    groups.then((data) => {
+                        console.info(data);
+                        data.forEach((group) => {
+                            let option = document.createElement('option');
+                            option.value = group.id;
+                            option.textContent = group.name;
+                            elSelect.appendChild(option);
+                        });
+                    });
+
+                }
+
+
+
+            });
+
+            document.getElementById('csr-upload-cancel').addEventListener('click', function (e) {
+                // Reset form
+                document.getElementById('csr-qti-file').value = '';
+                document.getElementById('csr-question-group').selectedIndex = 0;
+                document.getElementById('csr-import').classList.add('csr-hidden');
             });
 
             document.getElementById('csr-upload-qti').addEventListener('click', function () {
@@ -140,7 +182,6 @@ const csrClassQuiz = {
      * make the API calls to add the questions.
      */
     processContents: function (contents, quizId, groupId) {
-        console.info(contents);
         // Need a dom parser
         const parser = new DOMParser();
         // Parse the imsmanifest.xml file
@@ -160,7 +201,18 @@ const csrClassQuiz = {
             return;
         }
 
-        // Loop through each file and process it
+
+        let elStatus = document.getElementById('csr-upload-message');
+        elStatus.classList.add('csr-hidden');
+        elStatus.textContent = '';
+
+        let elProgress = document.getElementById('csr-upload-progress');
+        elProgress.setAttribute('value', '0');
+        elProgress.setAttribute('max', files.length);
+        elProgress.classList.remove('csr-hidden');
+
+        // Loop through each file and process 
+        let itemsProcessed = 0;
         files.forEach(function (file) {
             const href = file.getAttribute('href');
             if (contents[href]) {
@@ -172,12 +224,23 @@ const csrClassQuiz = {
                 const items = fileDom.querySelectorAll('section[ident="root_section"] > item');
                 items.forEach(function (item) {
                     csrClassQuiz.submitQuestion(item, quizId, groupId);
+                    elProgress.setAttribute('value', parseInt(elProgress.getAttribute('value')) + 1);
+                    itemsProcessed += 1;
                 });
 
             } else {
                 console.warn(`File ${href} not found in the zip contents.`);
             }
         });
+
+        elProgress.classList.add('csr-hidden');
+
+        elStatus.textContent = itemsProcessed + ' questions uploaded. You may need to save or refresh the view to see the new questions.';
+        elStatus.classList.remove('csr-hidden');
+
+        // Reset the form
+        document.getElementById('csr-qti-file').value = '';
+        document.getElementById('csr-question-group').selectedIndex = 0;
     },
 
 
@@ -197,6 +260,8 @@ const csrClassQuiz = {
             questionOptions[fieldName] = fieldValue;
         });
 
+        let elGroupSelect = document.querySelector('#csr-question-group');
+
         let apiData = {
             'question_name': questionOptions.title,
             'question_text': item.querySelector('presentation > material > mattext').textContent.trim(),
@@ -205,7 +270,7 @@ const csrClassQuiz = {
             'neutral_comments_html': item.querySelector('itemfeedback[ident="general_fb"] > flow_mat > material > mattext') ? item.querySelector('itemfeedback[ident="general_fb"] > flow_mat > material > mattext').textContent.trim() : '',
             'correct_comments_html': item.querySelector('itemfeedback[ident="correct_fb"] > flow_mat > material > mattext') ? item.querySelector('itemfeedback[ident="correct_fb"] > flow_mat > material > mattext').textContent.trim() : '',
             'incorrect_comments_html': item.querySelector('itemfeedback[ident="general_incorrect_fb"] > flow_mat > material > mattext') ? item.querySelector('itemfeedback[ident="general_incorrect_fb"] > flow_mat >  material > mattext').textContent.trim() : '',
-            'quiz_group_id': null,
+            'quiz_group_id': elGroupSelect.value == '' ? null : parseInt(elGroupSelect.value),
             'position': null
         };
 
@@ -269,8 +334,6 @@ const csrClassQuiz = {
             'question': apiData
         };
 
-        console.info(apiData);
-
         fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -287,7 +350,6 @@ const csrClassQuiz = {
             }
         }).then(function (data) {
             console.log('Question added successfully:', data);
-            alert('Question added successfully: ' + data.question_name);
 
             // Optionally, you can reload the page or update the UI to reflect the new question
             // window.location.reload();
@@ -303,11 +365,44 @@ const csrClassQuiz = {
      */
     csrfToken: () => {
         return decodeURIComponent((document.cookie.match('(^|;) *_csrf_token=([^;]*)') || '')[2])
+    },
+
+
+    getGroups: async () => {
+
+        let els = document.querySelectorAll('.update_group_url');
+        let groups = [];
+
+        await Promise.all([...els].map(async (el) => {
+            let url = el.getAttribute('href');
+            let match = url.match(/\/courses\/(\d+)\/quizzes\/(\d+)\/groups\/(\d+)/);
+            if (match) {
+                let apiUrl = window.location.protocol + '//' + window.location.host + '/api/v1/courses/' + match[1] + '/quizzes/' + match[2] + '/groups/' + match[3];
+
+
+                let response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'accept': 'application/json',
+                        'X-CSRF-Token': csrClassQuiz.csrfToken()
+                    }
+                });
+
+                let data = await response.json();
+
+                groups.push({
+                    id: data.id,
+                    name: data.name,
+                    quiz_id: data.quiz_id
+                });
+            }
+        }));
+        return groups;
     }
 }
 
 csrClassQuiz.init();
-
 
 
 // Add listener to upload

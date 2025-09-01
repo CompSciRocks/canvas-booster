@@ -19,6 +19,19 @@ div#csr-import {
 }
 
 .csr-buttons > div {
-    white-space: nowrap;
     flex-grow: 1;
+}
+
+.csr-buttons > div > span {
+    white-space: wrap;
+}
+.csr-nowrap {
+    white-space: nowrap;
+}
+
+.csr-form-grid {
+    display: inline-grid;
+    grid-template-columns: auto auto;
+    gap: 10px;
+    margin-top: 10px;
 }
